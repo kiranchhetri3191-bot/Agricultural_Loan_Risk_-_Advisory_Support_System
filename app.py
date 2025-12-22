@@ -32,3 +32,5 @@ price_history = {
 }
 
 #
+print(df)
+
