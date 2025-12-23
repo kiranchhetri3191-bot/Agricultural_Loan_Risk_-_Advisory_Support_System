@@ -126,8 +126,6 @@ Technology is used strictly as a **support tool for financial analysis**, not as
 
 2. Run the application
                
-
-  ```bash
   streamlit run app.py
  ```
 
