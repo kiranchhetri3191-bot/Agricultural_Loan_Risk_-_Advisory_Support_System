@@ -120,14 +120,12 @@ Technology is used strictly as a **support tool for financial analysis**, not as
 ## ▶️ How to Run the Project
 
 1. Install required packages  
-    ```bash
-    pip install -r requirements.txt
-  ```
-
+   ```bash
+  pip install -r requirements.txt
+```
 
 2. Run the application          
-```
-         
+```bash 
   streamlit run app.py     
  ```
 
