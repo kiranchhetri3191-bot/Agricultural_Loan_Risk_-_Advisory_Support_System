@@ -1,28 +1,49 @@
-import streamlit as st
-import pandas as pd
-import matplotlib.pyplot as plt
+# app.py
+# Smart Farmer Advisory + Loan Risk System
+# Flat structure | CSV / Excel input supported | Streamlit
+
+import os
 import numpy as np
+import pandas as pd
+import streamlit as st
+import matplotlib.pyplot as plt
+import joblib
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(
-    page_title="Advanced Farmer Advisory System",
+    page_title="Smart Farmer Advisory & Loan Risk System",
     page_icon="🌾",
     layout="wide"
 )
 
+DATA_FILE = "agri_loan_data.csv"
+MODEL_FILE = "loan_model.joblib"
+RANDOM_STATE = 42
+
 # ---------------- TITLE ----------------
 st.markdown(
     """
-    <h1 style='text-align:center; color:#2E8B57;'>🌾 Smart Farmer Advisory System</h1>
+    <h1 style='text-align:center; color:#2E8B57;'>🌾 Smart Farmer Advisory & Loan Risk System</h1>
     <p style='text-align:center; font-size:18px;'>
-    Crop • Weather • Fertilizer • Yield • Market • Graphs
+    Advisory • Yield • Credit Risk • CSV / Excel Input
     </p>
     """,
     unsafe_allow_html=True
 )
 
-# ---------------- SIDEBAR INPUT ----------------
-st.sidebar.header("👨‍🌾 Farmer Inputs")
+# =========================================================
+# PART 1: FARMER ADVISORY (MANUAL INPUT)
+# =========================================================
+
+st.sidebar.header("👨‍🌾 Farmer Advisory Inputs")
 
 soil_type = st.sidebar.selectbox(
     "Soil Type",
@@ -38,142 +59,140 @@ rainfall = st.sidebar.slider("Annual Rainfall (mm)", 200, 2000, 850)
 temperature = st.sidebar.slider("Temperature (°C)", 10, 45, 30)
 land_size = st.sidebar.slider("Land Size (Acres)", 1, 20, 5)
 
-crop_issue = st.sidebar.selectbox(
-    "Crop Problem",
-    ["None", "Pest Attack", "Yellow Leaves", "Low Yield"]
-)
-
-# ---------------- CORE LOGIC ----------------
-def crop_recommendation(soil, season, rain):
-    if season == "Kharif":
-        return "Rice, Cotton, Maize" if rain > 700 else "Millets, Pulses"
-    elif season == "Rabi":
-        return "Wheat, Mustard" if soil in ["Alluvial", "Red"] else "Gram"
-    else:
-        return "Watermelon, Vegetables"
-
-def fertilizer_advice(soil):
-    return {
-        "Black": "Nitrogen & Phosphorus",
-        "Red": "Organic manure + Potash",
-        "Alluvial": "Balanced NPK",
-        "Laterite": "Organic compost",
-        "Sandy": "Frequent organic fertilizer"
-    }[soil]
-
-def pest_advice(issue):
-    return {
-        "Pest Attack": "Neem oil or bio-pesticides",
-        "Yellow Leaves": "Nitrogen deficiency – apply urea",
-        "Low Yield": "Check soil & irrigation",
-        "None": "No pest issues detected"
-    }[issue]
-
-def weather_advice(temp, rain):
-    if temp > 35:
-        return "Heat stress – increase irrigation"
-    elif rain < 400:
-        return "Low rainfall – use drip irrigation"
-    else:
-        return "Weather is favorable"
-
 def yield_estimation(acres, rain):
-    base_yield = 20  # quintals per acre
+    base_yield = 20
     factor = 1.2 if rain > 700 else 0.8
     return round(acres * base_yield * factor, 2)
 
-# ---------------- CALCULATIONS ----------------
-crop = crop_recommendation(soil_type, season, rainfall)
-fertilizer = fertilizer_advice(soil_type)
-pest = pest_advice(crop_issue)
-weather = weather_advice(temperature, rainfall)
 yield_est = yield_estimation(land_size, rainfall)
 
-# ---------------- SUMMARY TABLE ----------------
-st.markdown("## 📋 Advisory Summary")
+# =========================================================
+# PART 2: LOAN DATA GENERATION + MODEL
+# =========================================================
 
-summary_df = pd.DataFrame({
-    "Category": [
-        "Recommended Crops",
-        "Fertilizer Advice",
-        "Pest Advisory",
-        "Weather Advisory",
-        "Estimated Yield (Quintals)"
-    ],
-    "Details": [
-        crop,
-        fertilizer,
-        pest,
-        weather,
-        yield_est
+def generate_loan_data(n=1500):
+    rng = np.random.default_rng(RANDOM_STATE)
+    crops = ["Rice", "Wheat", "Cotton", "Sugarcane", "Pulses"]
+
+    df = pd.DataFrame({
+        "farmer_age": rng.integers(21, 70, n),
+        "land_size_acres": rng.uniform(0.5, 20, n),
+        "crop_type": rng.choice(crops, n),
+        "annual_income": rng.integers(100000, 1500000, n),
+        "irrigation_available": rng.choice(["Yes", "No"], n),
+        "existing_loan": rng.choice(["Yes", "No"], n),
+        "previous_default": rng.choice(["Yes", "No"], n, p=[0.15, 0.85]),
+        "credit_score": rng.integers(300, 900, n),
+        "loan_amount_requested": rng.integers(50000, 2000000, n),
+        "loan_tenure_years": rng.integers(1, 7, n)
+    })
+
+    score = (
+        (df["credit_score"] >= 650).astype(int) +
+        (df["previous_default"] == "No").astype(int) +
+        (df["annual_income"] >= 300000).astype(int) +
+        (df["loan_amount_requested"] <= 5 * df["annual_income"]).astype(int) +
+        (df["irrigation_available"] == "Yes").astype(int)
+    )
+
+    df["loan_approved"] = np.where(score >= 3, "Yes", "No")
+    return df
+
+if not os.path.exists(DATA_FILE):
+    generate_loan_data().to_csv(DATA_FILE, index=False)
+
+df = pd.read_csv(DATA_FILE)
+
+X = df.drop(columns=["loan_approved"])
+y = df["loan_approved"]
+
+cat_cols = X.select_dtypes(include="object").columns
+num_cols = X.select_dtypes(exclude="object").columns
+
+preprocess = ColumnTransformer([
+    ("cat", OneHotEncoder(handle_unknown="ignore"), cat_cols),
+    ("num", "passthrough", num_cols)
+])
+
+def train_model():
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.25, random_state=RANDOM_STATE, stratify=y
+    )
+
+    models = [
+        LogisticRegression(max_iter=1000),
+        RandomForestClassifier(n_estimators=200, random_state=RANDOM_STATE)
     ]
-})
 
-st.table(summary_df)
+    best_model, best_acc = None, 0
 
-# ---------------- DASHBOARD CARDS ----------------
-st.markdown("## 📊 Quick Insights")
-c1, c2, c3, c4 = st.columns(4)
+    for m in models:
+        pipe = Pipeline([("prep", preprocess), ("model", m)])
+        pipe.fit(X_train, y_train)
+        acc = accuracy_score(y_test, pipe.predict(X_test))
+        if acc > best_acc:
+            best_acc = acc
+            best_model = pipe
 
-c1.success(f"🌾 Crops\n\n{crop}")
-c2.info(f"🧪 Fertilizer\n\n{fertilizer}")
-c3.warning(f"🐛 Pest\n\n{pest}")
-c4.success(f"📦 Yield\n\n{yield_est} Qt")
+    joblib.dump(best_model, MODEL_FILE)
+    return best_model
 
-# ---------------- GRAPHS ----------------
-st.markdown("## 📈 Analytical Graphs")
+model = joblib.load(MODEL_FILE) if os.path.exists(MODEL_FILE) else train_model()
 
-col1, col2 = st.columns(2)
+# =========================================================
+# PART 3: CSV / EXCEL INPUT FOR LOAN PREDICTION
+# =========================================================
 
-# Rainfall Suitability Graph
-with col1:
-    st.subheader("🌧️ Rainfall Suitability")
-    rain_levels = ["Low", "Moderate", "High"]
-    values = [300, 800, 1500]
+st.markdown("## 📂 Loan Prediction via CSV / Excel Upload")
 
-    plt.figure()
-    plt.bar(rain_levels, values)
-    plt.axhline(rainfall)
-    st.pyplot(plt)
+uploaded_file = st.file_uploader(
+    "Upload CSV or Excel file (loan applicant data)",
+    type=["csv", "xlsx"]
+)
 
-# Temperature Advisory Graph
-with col2:
-    st.subheader("🌡️ Temperature Analysis")
-    temps = np.arange(10, 46)
-    stress = np.where((temps < 15) | (temps > 35), 1, 0)
+required_columns = list(X.columns)
 
-    plt.figure()
-    plt.plot(temps, stress)
-    st.pyplot(plt)
+if uploaded_file:
+    if uploaded_file.name.endswith(".csv"):
+        input_data = pd.read_csv(uploaded_file)
+    else:
+        input_data = pd.read_excel(uploaded_file)
 
-# Soil Health Graph
-st.markdown("## 🌱 Soil Health Index")
+    st.subheader("📄 Uploaded Data Preview")
+    st.dataframe(input_data.head())
 
-soil_health = {
-    "Alluvial": 85,
-    "Black": 80,
-    "Red": 70,
-    "Laterite": 65,
-    "Sandy": 60
-}
+    missing_cols = set(required_columns) - set(input_data.columns)
+    if missing_cols:
+        st.error(f"Missing required columns: {missing_cols}")
+    else:
+        predictions = model.predict(input_data)
+        probabilities = model.predict_proba(input_data).max(axis=1) * 100
 
-plt.figure()
-plt.bar(soil_health.keys(), soil_health.values())
-st.pyplot(plt)
+        def risk_logic(row):
+            if row["credit_score"] < 600 or row["previous_default"] == "Yes":
+                return "High"
+            if row["loan_amount_requested"] > 5 * row["annual_income"]:
+                return "Medium"
+            return "Low"
 
-# Market Price Trend (Sample)
-st.markdown("## 💰 Crop Market Price Trend (Sample Data)")
+        input_data["Loan_Decision"] = predictions
+        input_data["Approval_Probability_%"] = probabilities.round(2)
+        input_data["Risk_Category"] = input_data.apply(risk_logic, axis=1)
 
-months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
-price = [1800, 1850, 1900, 2000, 2100, 2050]
+        st.subheader("✅ Prediction Results")
+        st.dataframe(input_data)
 
-plt.figure()
-plt.plot(months, price)
-st.pyplot(plt)
+        csv = input_data.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "⬇️ Download Results CSV",
+            csv,
+            "loan_predictions.csv",
+            "text/csv"
+        )
 
 # ---------------- FOOTER ----------------
 st.markdown("---")
 st.markdown(
-    "<p style='text-align:center;'>Advanced Farmer Advisory System | Python + Streamlit</p>",
+    "<p style='text-align:center;'>Smart Farmer Advisory & Loan Risk System | CSV & Excel Enabled</p>",
     unsafe_allow_html=True
 )
