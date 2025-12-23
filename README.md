@@ -128,10 +128,10 @@ pip install -r requirements.txt
 2. Run the application
              
 ```bash 
-  streamlit run app.py     
- ```
+streamlit run app.py     
+```
 
-3.Upload an agricultural loan CSV file and explore insights
+ 3.Upload an agricultural loan CSV file and explore insights
 
 ## ⚖️ Legal & Ethical Note
 
