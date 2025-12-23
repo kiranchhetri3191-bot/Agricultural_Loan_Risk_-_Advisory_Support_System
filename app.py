@@ -30,7 +30,7 @@ This system is a **Decision Support System (DSS)** only.
 - NOT a loan approval authority  
 - Uses **synthetic logic & demo ML**  
 - No real farmer, Aadhaar, land registry or CIBIL data  
-- Outputs are **risk insights**, not decisions  
+- Outputs are **risk insights & educational suggestions**, not decisions  
 
 **Use for education, research, NGOs & training only**
 """)
@@ -40,7 +40,7 @@ st.divider()
 # ---------------- TITLE ----------------
 st.markdown("""
 <h1 style='text-align:center; color:#2E8B57;'>🌾 Agricultural Loan Risk & Insight Platform</h1>
-<p style='text-align:center;'>CSV Upload • Visual Analytics • Early Risk Detection</p>
+<p style='text-align:center;'>CSV Upload • Visual Analytics • Advisory Support</p>
 """, unsafe_allow_html=True)
 
 # ---------------- DEMO DATA ----------------
@@ -111,7 +111,7 @@ if file:
 
     df["Risk_Prediction"] = model.predict(df)
 
-    # Risk categories (impactful)
+    # ---------------- RISK CATEGORY ----------------
     def risk_label(row):
         if row["Risk_Prediction"] == 1:
             return "Low Risk"
@@ -122,7 +122,33 @@ if file:
 
     df["Risk_Category"] = df.apply(risk_label, axis=1)
 
-    st.success("✅ Risk Analysis Completed")
+    # ---------------- ADVISORY ENGINE (SAFE) ----------------
+    def improvement_advice(row):
+        advice = []
+
+        if row["credit_score"] < 600:
+            advice.append("Improve repayment discipline & credit behaviour")
+
+        if row["loan_amount"] > row["annual_farm_income"] * 1.5:
+            advice.append("Consider lower loan amount or phased borrowing")
+
+        if row["land_size_acres"] < 1:
+            advice.append("Small landholding – explore SHG / group-based lending")
+
+        if row["irrigation_type"] == le_irrig.transform(["Rainfed"])[0]:
+            advice.append("Rainfed farming – irrigation support schemes may help")
+
+        if row["existing_loans"] > 1:
+            advice.append("High loan burden – reduce existing liabilities")
+
+        if not advice:
+            advice.append("Profile appears financially stable")
+
+        return " | ".join(advice)
+
+    df["Improvement_Suggestions"] = df.apply(improvement_advice, axis=1)
+
+    st.success("✅ Risk & Advisory Analysis Completed")
 
     st.dataframe(df)
 
@@ -131,7 +157,7 @@ if file:
     st.download_button(
         "⬇️ Download Result CSV",
         csv,
-        "agri_loan_risk_analysis.csv",
+        "agri_loan_risk_advisory.csv",
         "text/csv"
     )
 
@@ -160,15 +186,17 @@ if file:
     ax.set_title("Income vs Loan Amount (Risk View)")
     st.pyplot(fig)
 
-    fig, ax = plt.subplots()
-    df.groupby("crop_type")["Risk_Category"].value_counts().unstack().plot(kind="bar", ax=ax)
-    ax.set_title("Crop-wise Risk Pattern")
-    st.pyplot(fig)
+    # ---------------- TOP RISK REASONS ----------------
+    st.header("🚩 Common Risk Drivers (Educational Insight)")
+    risk_reasons = {
+        "Low Credit Score": (df["credit_score"] < 600).sum(),
+        "High Loan vs Income": (df["loan_amount"] > df["annual_farm_income"] * 1.5).sum(),
+        "Rainfed Agriculture": (df["irrigation_type"] == le_irrig.transform(["Rainfed"])[0]).sum(),
+        "Multiple Existing Loans": (df["existing_loans"] > 1).sum()
+    }
 
-    fig, ax = plt.subplots()
-    df.groupby("irrigation_type")["Risk_Category"].value_counts().unstack().plot(kind="bar", ax=ax)
-    ax.set_title("Irrigation Impact")
-    st.pyplot(fig)
+    reason_df = pd.DataFrame.from_dict(risk_reasons, orient="index", columns=["Count"])
+    st.bar_chart(reason_df)
 
     # ---------------- PDF REPORT ----------------
     def generate_pdf():
@@ -177,9 +205,13 @@ if file:
         styles = getSampleStyleSheet()
         story = []
 
-        story.append(Paragraph("Agricultural Loan Risk Summary (Demo)", styles["Title"]))
-        story.append(Paragraph("This report is for educational & analytical purposes only.", styles["Normal"]))
-        story.append(Paragraph(f"Total Records: {len(df)}", styles["Normal"]))
+        story.append(Paragraph("Agricultural Loan Risk & Advisory Summary (Demo)", styles["Title"]))
+        story.append(Paragraph(
+            "This report is generated for educational and decision-support purposes only. "
+            "It does not represent any bank or regulatory decision.",
+            styles["Normal"]
+        ))
+        story.append(Paragraph(f"Total Records Analysed: {len(df)}", styles["Normal"]))
         story.append(Paragraph(str(df["Risk_Category"].value_counts()), styles["Normal"]))
 
         doc.build(story)
@@ -190,7 +222,7 @@ if file:
     st.download_button(
         "⬇️ Download PDF Summary",
         pdf,
-        "agri_loan_risk_report.pdf",
+        "agri_loan_risk_advisory_report.pdf",
         "application/pdf"
     )
 
@@ -200,10 +232,10 @@ else:
 # ---------------- FOOTER ----------------
 st.divider()
 st.markdown("""
-### 🌱 REAL IMPACT
-✔ Farmer financial awareness & risk literacy 
-✔ NGO & co-op decision support  
-✔ Early loan stress / NPA risk indication  
-✔ Policy simulation  
-✔ Portfolio-ready project (B.Com + Analytics)
+### 🌱 REAL-WORLD IMPACT
+✔ Farmer financial awareness & literacy  
+✔ NGO & cooperative decision support  
+✔ Early loan stress / NPA risk signals  
+✔ Policy & training simulations  
+✔ Strong portfolio project (B.Com + Analytics)
 """)
