@@ -222,29 +222,83 @@ if file:
         "Medium Risk": "#F9A825",
         "High Risk": "#C62828"
     })
-    ax.scatter(
-        df["annual_farm_income"],
-        df["loan_amount"],
-        c=color_map,
-        alpha=0.6
-    )
+    ax.scatter(df["annual_farm_income"], df["loan_amount"], c=color_map, alpha=0.6)
     ax.set_title("Income vs Loan Amount (Risk Perspective)", fontsize=14, fontweight="bold")
     ax.set_xlabel("Annual Farm Income (₹)")
     ax.set_ylabel("Loan Amount (₹)")
     ax.grid(alpha=0.3)
     st.pyplot(fig)
 
-    # ---- BAR CHART ----
+    # ---- RISK CATEGORY COUNT (FIXED COLORS) ----
     st.subheader("Risk Category Count")
+
+    risk_order = ["Low Risk", "Medium Risk", "High Risk"]
+    risk_counts = df["Risk_Category"].value_counts().reindex(risk_order, fill_value=0)
+
+    risk_colors = {
+        "Low Risk": "#2E7D32",
+        "Medium Risk": "#F9A825",
+        "High Risk": "#C62828"
+    }
+
     fig, ax = plt.subplots(figsize=(7, 4))
-    df["Risk_Category"].value_counts().plot(
-        kind="bar",
-        color=["#2E7D32", "#F9A825", "#C62828"],
-        ax=ax
+    ax.bar(
+        risk_counts.index,
+        risk_counts.values,
+        color=[risk_colors[r] for r in risk_counts.index]
     )
+    ax.set_title("Number of Farmers by Risk Level", fontsize=14, fontweight="bold")
     ax.set_xlabel("Risk Category")
     ax.set_ylabel("Count")
-    ax.set_title("Number of Farmers by Risk Level", fontsize=14, fontweight="bold")
+    ax.grid(axis="y", alpha=0.3)
+    st.pyplot(fig)
+
+    # ---- BOXPLOT: INCOME BY RISK ----
+    st.subheader("Income Distribution by Risk Category")
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    df.boxplot(column="annual_farm_income", by="Risk_Category", ax=ax, grid=True)
+    ax.set_title("Annual Farm Income by Risk Level", fontsize=14, fontweight="bold")
+    ax.set_xlabel("Risk Category")
+    ax.set_ylabel("Annual Farm Income (₹)")
+    plt.suptitle("")
+    st.pyplot(fig)
+
+    # ---- STACKED BAR: CROP vs RISK ----
+    st.subheader("Crop Type vs Risk Category")
+
+    crop_risk = df.groupby("crop_type")["Risk_Category"].value_counts().unstack().fillna(0)
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    crop_risk[risk_order].plot(
+        kind="bar",
+        stacked=True,
+        color=[risk_colors[r] for r in risk_order],
+        ax=ax
+    )
+    ax.set_title("Crop-wise Risk Distribution", fontsize=14, fontweight="bold")
+    ax.set_xlabel("Crop Type")
+    ax.set_ylabel("Number of Farmers")
+    ax.legend(title="Risk Category")
+    ax.grid(axis="y", alpha=0.3)
+    st.pyplot(fig)
+
+    # ---- STACKED BAR: IRRIGATION vs RISK ----
+    st.subheader("Irrigation Type vs Risk Category")
+
+    irrig_risk = df.groupby("irrigation_type")["Risk_Category"].value_counts().unstack().fillna(0)
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    irrig_risk[risk_order].plot(
+        kind="bar",
+        stacked=True,
+        color=[risk_colors[r] for r in risk_order],
+        ax=ax
+    )
+    ax.set_title("Irrigation Impact on Risk", fontsize=14, fontweight="bold")
+    ax.set_xlabel("Irrigation Type")
+    ax.set_ylabel("Number of Farmers")
+    ax.legend(title="Risk Category")
     ax.grid(axis="y", alpha=0.3)
     st.pyplot(fig)
 
