@@ -201,9 +201,9 @@ else:
 st.divider()
 st.markdown("""
 ### 🌱 REAL IMPACT
-✔ Farmer financial awareness  
+✔ Farmer financial awareness & risk literacy 
 ✔ NGO & co-op decision support  
-✔ Early NPA warning  
+✔ Early loan stress / NPA risk indication  
 ✔ Policy simulation  
-✔ Strong resume project (B.Com + Analytics)
+✔ Portfolio-ready project (B.Com + Analytics)
 """)
