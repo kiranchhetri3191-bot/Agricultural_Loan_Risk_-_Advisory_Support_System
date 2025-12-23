@@ -1,217 +1,116 @@
 # app.py
-# Smart Farmer Advisory & Loan Risk Indicator System
-# SAFE | OPEN-SOURCE | NON-BINDING | EDUCATIONAL
+# Smart Farmer Advisory System (SAFE VERSION)
 
 import os
-import requests
-import numpy as np
-import pandas as pd
-import streamlit as st
 import joblib
-from io import BytesIO
+import pandas as pd
+import numpy as np
+import streamlit as st
 
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder
 from sklearn.ensemble import RandomForestClassifier
 
-# =========================================================
-# PAGE CONFIG
-# =========================================================
+# -------------------------------------------------
+# CONFIG
+# -------------------------------------------------
+st.set_page_config(page_title="Smart Farmer Advisory System", layout="wide")
 
-st.set_page_config(
-    page_title="Smart Farmer Advisory System",
-    page_icon="🌾",
-    layout="wide"
-)
+MODEL_FILE = "risk_model.pkl"
+TARGET = "risk_flag"
 
-st.markdown(
-    "<h1 style='text-align:center;color:#2E8B57;'>🌾 Smart Farmer Advisory System</h1>",
-    unsafe_allow_html=True
-)
-
-# =========================================================
-# LOCATION SEARCH (OPENSTREETMAP)
-# =========================================================
-
-def search_locations(query, state):
-    url = "https://nominatim.openstreetmap.org/search"
-    params = {
-        "q": f"{query}, {state}, India",
-        "format": "json",
-        "limit": 5
+# -------------------------------------------------
+# SAMPLE DATA (replace later with API / CSV)
+# -------------------------------------------------
+def load_data():
+    data = {
+        "state": ["Andhra Pradesh", "Andhra Pradesh", "Karnataka", "Tamil Nadu"],
+        "rainfall": [900, 1200, 800, 700],
+        "temperature": [32, 30, 28, 33],
+        "crop": ["Rice", "Cotton", "Maize", "Sugarcane"],
+        "risk_flag": [1, 0, 1, 0],  # target
     }
-    headers = {"User-Agent": "SmartFarmer-Advisory"}
-    r = requests.get(url, params=params, headers=headers, timeout=10)
-    return r.json() if r.status_code == 200 else []
+    return pd.DataFrame(data)
 
-# =========================================================
-# WEATHER DATA (OPEN-METEO)
-# =========================================================
+df = load_data()
 
-def get_climate(lat, lon):
-    url = "https://api.open-meteo.com/v1/forecast"
-    params = {
-        "latitude": lat,
-        "longitude": lon,
-        "daily": "temperature_2m_mean,precipitation_sum",
-        "past_days": 30,
-        "timezone": "auto"
-    }
-    r = requests.get(url, params=params, timeout=10)
-    d = r.json()
-
-    avg_temp = np.mean(d["daily"]["temperature_2m_mean"])
-    total_rain = np.sum(d["daily"]["precipitation_sum"])
-
-    return round(avg_temp, 1), round(total_rain, 1)
-
-# =========================================================
-# EXPORT FUNCTIONS
-# =========================================================
-
-def to_excel(df):
-    buffer = BytesIO()
-    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False)
-    buffer.seek(0)
-    return buffer.getvalue()
-
-def to_pdf(df):
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4)
-    styles = getSampleStyleSheet()
-    elements = [Paragraph("Indicative Loan Risk Report", styles["Title"])]
-
-    table = Table([df.columns.tolist()] + df.values.tolist())
-    table.setStyle(TableStyle([
-        ("GRID", (0,0), (-1,-1), 0.5, colors.black),
-        ("BACKGROUND", (0,0), (-1,0), colors.lightgrey)
-    ]))
-
-    elements.append(table)
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer
-
-# =========================================================
-# SIDEBAR LOCATION ADVISORY
-# =========================================================
+# -------------------------------------------------
+# UI
+# -------------------------------------------------
+st.title("🌾 Smart Farmer Advisory System")
 
 st.sidebar.header("📍 Location Advisory (India)")
+state = st.sidebar.selectbox("State", sorted(df["state"].unique()))
+city = st.sidebar.text_input("Search Village / Town / City")
 
-state = st.sidebar.selectbox(
-    "State",
-    [
-        "Andhra Pradesh","Assam","Bihar","Chhattisgarh","Delhi",
-        "Gujarat","Haryana","Himachal Pradesh","Jharkhand",
-        "Karnataka","Kerala","Madhya Pradesh","Maharashtra",
-        "Odisha","Punjab","Rajasthan","Tamil Nadu","Telangana",
-        "Uttar Pradesh","Uttarakhand","West Bengal"
+st.divider()
+
+# -------------------------------------------------
+# DEBUG (remove later)
+# -------------------------------------------------
+st.write("🔎 Current columns:", df.columns.tolist())
+
+# -------------------------------------------------
+# FEATURE / TARGET SPLIT (SAFE)
+# -------------------------------------------------
+X = df.drop(columns=[TARGET], errors="ignore")
+
+y = df[TARGET] if TARGET in df.columns else None
+
+# -------------------------------------------------
+# PREPROCESSING
+# -------------------------------------------------
+categorical_cols = X.select_dtypes(include=["object"]).columns.tolist()
+numeric_cols = X.select_dtypes(exclude=["object"]).columns.tolist()
+
+preprocessor = ColumnTransformer(
+    transformers=[
+        ("cat", OneHotEncoder(handle_unknown="ignore"), categorical_cols),
+        ("num", "passthrough", numeric_cols),
     ]
 )
 
-search_text = st.sidebar.text_input("Search Village / Town / City")
-
-locations = search_locations(search_text, state) if search_text else []
-
-if locations:
-    options = {loc["display_name"]: loc for loc in locations}
-    selected = st.sidebar.selectbox("Select Location", list(options.keys()))
-    lat = float(options[selected]["lat"])
-    lon = float(options[selected]["lon"])
-
-    temp, rain = get_climate(lat, lon)
-
-    st.sidebar.markdown("### 🌦 Climate Indicator")
-    st.sidebar.write(f"🌡 Avg Temperature: {temp} °C")
-    st.sidebar.write(f"🌧 Rainfall (30 days): {rain} mm")
-
-# =========================================================
-# MODEL TRAINING (SAFE)
-# =========================================================
-
-DATA_FILE = "agri_loan_data.csv"
-MODEL_FILE = "loan_model.joblib"
-
-def generate_data(n=1500):
-    rng = np.random.default_rng(42)
-    df = pd.DataFrame({
-        "land_size_acres": rng.uniform(0.5, 20, n),
-        "annual_income": rng.integers(100000, 1500000, n),
-        "credit_score": rng.integers(300, 900, n),
-        "previous_default": rng.choice(["Yes","No"], n, p=[0.15,0.85]),
-    })
-
-    df["risk_flag"] = np.where(
-        (df.credit_score > 650) & (df.previous_default == "No"),
-        "Lower Risk",
-        "Higher Risk"
-    )
-    return df
-
-if not os.path.exists(DATA_FILE):
-    generate_data().to_csv(DATA_FILE, index=False)
-
-df = pd.read_csv(DATA_FILE)
-
-X = df.drop(columns=["risk_flag"])
-y = df["risk_flag"]
-
-required_features = X.columns.tolist()
-
-preprocess = ColumnTransformer([
-    ("cat", OneHotEncoder(handle_unknown="ignore"), ["previous_default"]),
-    ("num", "passthrough", ["land_size_acres","annual_income","credit_score"])
-])
-
-model = Pipeline([
-    ("prep", preprocess),
-    ("model", RandomForestClassifier(n_estimators=150, random_state=42))
-])
-
-model.fit(X, y)
-joblib.dump(model, MODEL_FILE)
-
-# =========================================================
-# FILE UPLOAD & PREDICTION
-# =========================================================
-
-st.markdown("## 📂 Loan Risk Indicator (CSV / Excel Upload)")
-
-file = st.file_uploader("Upload CSV or Excel", ["csv","xlsx"])
-
-if file:
-    data = pd.read_csv(file) if file.name.endswith(".csv") else pd.read_excel(file)
-
-    missing = set(required_features) - set(data.columns)
-    if missing:
-        st.error(f"Missing required columns: {missing}")
-        st.stop()
-
-    data = data[required_features]
-
-    data["Indicative_Risk_Category"] = model.predict(data)
-    data["Confidence_%"] = (model.predict_proba(data).max(axis=1) * 100).round(2)
-
-    st.dataframe(data, use_container_width=True)
-
-    st.download_button("⬇ Download CSV", data.to_csv(index=False), "risk_indicator.csv")
-    st.download_button("⬇ Download Excel", to_excel(data), "risk_indicator.xlsx")
-    st.download_button("⬇ Download PDF", to_pdf(data), "risk_indicator.pdf")
-
-# =========================================================
-# LEGAL DISCLAIMER
-# =========================================================
-
-st.markdown("---")
-st.caption(
-    "Disclaimer: This system provides general, non-binding advisory insights using publicly "
-    "available open-source data. Outputs are indicative only and do not constitute financial, "
-    "agricultural, or legal advice."
+pipe = Pipeline(
+    steps=[
+        ("prep", preprocessor),
+        ("model", RandomForestClassifier(n_estimators=100, random_state=42)),
+    ]
 )
+
+# -------------------------------------------------
+# TRAIN MODEL (ONLY IF NEEDED)
+# -------------------------------------------------
+if y is not None:
+    if not os.path.exists(MODEL_FILE):
+        pipe.fit(X, y)
+        joblib.dump(pipe, MODEL_FILE)
+        st.success("✅ Model trained and saved")
+    else:
+        pipe = joblib.load(MODEL_FILE)
+        st.info("📦 Model loaded from disk")
+else:
+    st.warning("⚠️ Target variable not found. Model not trained.")
+
+# -------------------------------------------------
+# PREDICTION SECTION
+# -------------------------------------------------
+st.subheader("📊 Risk Prediction")
+
+if os.path.exists(MODEL_FILE):
+    model = joblib.load(MODEL_FILE)
+
+    preds = model.predict(X)
+    df["predicted_risk"] = preds
+
+    st.dataframe(df)
+
+    high_risk = df[df["predicted_risk"] == 1]
+    if not high_risk.empty:
+        st.error("🚨 High Risk Areas Detected")
+        st.dataframe(high_risk)
+    else:
+        st.success("✅ No high-risk areas detected")
+
+else:
+    st.info("Model not available yet.")
