@@ -1,6 +1,6 @@
 # =========================================================
 # AGRICULTURAL LOAN DECISION SUPPORT SYSTEM (DSS)
-# FINAL POLISHED VERSION
+# FINAL POLISHED VERSION – GRAPH READABILITY IMPROVED
 # Safe | Legal | Educational | Visual | Impactful
 # =========================================================
 
@@ -41,27 +41,22 @@ st.sidebar.markdown("""
 3️⃣ Read **improvement suggestions**  
 4️⃣ Use visuals to understand patterns  
 
-⚠️ This tool supports **learning & awareness**
+⚠️ Educational & awareness tool only
 """)
 
 st.sidebar.divider()
-st.sidebar.info("📌 Educational Decision Support Tool")
+st.sidebar.info("📌 Decision Support Tool")
 
 # ---------------- DISCLAIMER ----------------
 st.markdown("""
 ### ⚠️ Legal & Ethical Disclaimer
-This platform is a **Decision Support System (DSS)** created for:
-
-- Education & learning  
-- Farmer financial awareness  
-- NGO / cooperative training  
-- Policy & academic simulation  
+This platform is a **Decision Support System (DSS)**.
 
 ❌ Not a bank / NBFC / RBI system  
 ❌ Not a loan approval authority  
 ❌ No real customer or credit bureau data  
 
-**Outputs indicate risk patterns only, not decisions**
+**Outputs show risk patterns only, not decisions**
 """)
 
 st.divider()
@@ -134,7 +129,7 @@ if file:
     ]
 
     if not all(c in df.columns for c in required_cols):
-        st.error("❌ CSV format mismatch. Please use the prescribed agricultural format.")
+        st.error("❌ CSV format mismatch.")
         st.stop()
 
     df["crop_type"] = le_crop.transform(df["crop_type"])
@@ -164,7 +159,7 @@ if file:
             advice.append("Consider lower or phased loan amount")
 
         if row["land_size_acres"] < 1:
-            advice.append("Explore SHG / group-based lending options")
+            advice.append("Explore SHG / group-based lending")
 
         if row["irrigation_type"] == le_irrig.transform(["Rainfed"])[0]:
             advice.append("Irrigation support schemes may reduce risk")
@@ -180,45 +175,77 @@ if file:
     df["Suggested_Improvements"] = df.apply(improvement_advice, axis=1)
 
     st.success("✅ Risk & Advisory Analysis Completed")
-
-    st.subheader("📋 Farmer-Level Risk & Advisory View")
     st.dataframe(df)
 
     # ---------------- DOWNLOAD CSV ----------------
-    csv = df.to_csv(index=False).encode("utf-8")
     st.download_button(
         "⬇️ Download Analysis CSV",
-        csv,
+        df.to_csv(index=False).encode("utf-8"),
         "agri_loan_risk_advisory.csv",
         "text/csv"
     )
 
-    # ---------------- VISUALS ----------------
+    # ================= VISUALS =================
     st.divider()
     st.header("📊 Dashboard Insights")
 
     col1, col2 = st.columns(2)
 
+    # ---- PIE CHART ----
     with col1:
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(6, 6))
         df["Risk_Category"].value_counts().plot.pie(
-            autopct="%1.1f%%", ax=ax
+            autopct="%1.1f%%",
+            startangle=90,
+            colors=["#2E7D32", "#F9A825", "#C62828"],
+            wedgeprops={"edgecolor": "white"},
+            ax=ax
         )
         ax.set_ylabel("")
-        ax.set_title("Risk Category Distribution")
+        ax.set_title("Overall Risk Distribution", fontsize=14, fontweight="bold")
         st.pyplot(fig)
 
+    # ---- HISTOGRAM ----
     with col2:
-        fig, ax = plt.subplots()
-        ax.hist(df["credit_score"], bins=20)
-        ax.set_title("Credit Score Distribution")
+        fig, ax = plt.subplots(figsize=(7, 5))
+        ax.hist(df["credit_score"], bins=25, color="#4CAF50", edgecolor="black")
+        ax.set_title("Credit Score Distribution", fontsize=14, fontweight="bold")
+        ax.set_xlabel("Credit Score")
+        ax.set_ylabel("Number of Farmers")
+        ax.grid(axis="y", alpha=0.3)
         st.pyplot(fig)
 
-    fig, ax = plt.subplots()
-    ax.scatter(df["annual_farm_income"], df["loan_amount"])
-    ax.set_xlabel("Annual Farm Income")
-    ax.set_ylabel("Loan Amount")
-    ax.set_title("Income vs Loan Amount (Risk View)")
+    # ---- SCATTER ----
+    fig, ax = plt.subplots(figsize=(8, 5))
+    color_map = df["Risk_Category"].map({
+        "Low Risk": "#2E7D32",
+        "Medium Risk": "#F9A825",
+        "High Risk": "#C62828"
+    })
+    ax.scatter(
+        df["annual_farm_income"],
+        df["loan_amount"],
+        c=color_map,
+        alpha=0.6
+    )
+    ax.set_title("Income vs Loan Amount (Risk Perspective)", fontsize=14, fontweight="bold")
+    ax.set_xlabel("Annual Farm Income (₹)")
+    ax.set_ylabel("Loan Amount (₹)")
+    ax.grid(alpha=0.3)
+    st.pyplot(fig)
+
+    # ---- BAR CHART ----
+    st.subheader("Risk Category Count")
+    fig, ax = plt.subplots(figsize=(7, 4))
+    df["Risk_Category"].value_counts().plot(
+        kind="bar",
+        color=["#2E7D32", "#F9A825", "#C62828"],
+        ax=ax
+    )
+    ax.set_xlabel("Risk Category")
+    ax.set_ylabel("Count")
+    ax.set_title("Number of Farmers by Risk Level", fontsize=14, fontweight="bold")
+    ax.grid(axis="y", alpha=0.3)
     st.pyplot(fig)
 
     # ---------------- PDF REPORT ----------------
@@ -230,8 +257,7 @@ if file:
 
         story.append(Paragraph("Agricultural Loan Risk & Advisory Summary", styles["Title"]))
         story.append(Paragraph(
-            "This report is generated for educational and analytical purposes only. "
-            "It does not represent any bank or regulatory decision.",
+            "Educational & decision-support report only. Not a financial decision.",
             styles["Normal"]
         ))
         story.append(Paragraph(f"Total Records Analysed: {len(df)}", styles["Normal"]))
@@ -241,16 +267,15 @@ if file:
         buffer.seek(0)
         return buffer
 
-    pdf = generate_pdf()
     st.download_button(
         "⬇️ Download PDF Summary",
-        pdf,
+        generate_pdf(),
         "agri_loan_risk_summary.pdf",
         "application/pdf"
     )
 
 else:
-    st.info("📌 Upload CSV to begin risk & advisory analysis")
+    st.info("📌 Upload CSV to begin analysis")
 
 # ---------------- FOOTER ----------------
 st.divider()
@@ -261,5 +286,5 @@ st.markdown("""
 ✔ Supports early loan stress understanding  
 ✔ Ethical, explainable & legal by design  
 
-**Built as a Decision Support Tool — not a decision maker**
+**Decision Support Tool — not a decision maker**
 """)
