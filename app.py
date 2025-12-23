@@ -21,7 +21,22 @@ from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
 
 # =========================================================
-# SAFE LOCATION SEARCH (OPENSTREETMAP)
+# PAGE CONFIG
+# =========================================================
+
+st.set_page_config(
+    page_title="Smart Farmer Advisory System",
+    page_icon="🌾",
+    layout="wide"
+)
+
+st.markdown(
+    "<h1 style='text-align:center;color:#2E8B57;'>🌾 Smart Farmer Advisory System</h1>",
+    unsafe_allow_html=True
+)
+
+# =========================================================
+# LOCATION SEARCH (OPENSTREETMAP)
 # =========================================================
 
 def search_locations(query, state):
@@ -36,7 +51,7 @@ def search_locations(query, state):
     return r.json() if r.status_code == 200 else []
 
 # =========================================================
-# SAFE WEATHER DATA (OPEN-METEO)
+# WEATHER DATA (OPEN-METEO)
 # =========================================================
 
 def get_climate(lat, lon):
@@ -57,7 +72,7 @@ def get_climate(lat, lon):
     return round(avg_temp, 1), round(total_rain, 1)
 
 # =========================================================
-# EXPORT HELPERS
+# EXPORT FUNCTIONS
 # =========================================================
 
 def to_excel(df):
@@ -85,22 +100,7 @@ def to_pdf(df):
     return buffer
 
 # =========================================================
-# PAGE CONFIG
-# =========================================================
-
-st.set_page_config(
-    page_title="Smart Farmer Advisory System",
-    page_icon="🌾",
-    layout="wide"
-)
-
-st.markdown(
-    "<h1 style='text-align:center;color:#2E8B57;'>🌾 Smart Farmer Advisory System</h1>",
-    unsafe_allow_html=True
-)
-
-# =========================================================
-# LOCATION ADVISORY
+# SIDEBAR LOCATION ADVISORY
 # =========================================================
 
 st.sidebar.header("📍 Location Advisory (India)")
@@ -129,7 +129,7 @@ if locations:
     temp, rain = get_climate(lat, lon)
 
     st.sidebar.markdown("### 🌦 Climate Indicator")
-    st.sidebar.write(f"🌡 Avg Temp: {temp} °C")
+    st.sidebar.write(f"🌡 Avg Temperature: {temp} °C")
     st.sidebar.write(f"🌧 Rainfall (30 days): {rain} mm")
 
 # =========================================================
@@ -160,38 +160,29 @@ if not os.path.exists(DATA_FILE):
 
 df = pd.read_csv(DATA_FILE)
 
-# Features
-X = df.drop(columns=["risk_flag"], errors="ignore")
-
-#Target
+X = df.drop(columns=["risk_flag"])
 y = df["risk_flag"]
 
-#Train
-pipe.fit(X,y)
-
-#save model
-joblib.dump(pipe, MODEL_FILE]
-            
 required_features = X.columns.tolist()
 
-prep = ColumnTransformer([
+preprocess = ColumnTransformer([
     ("cat", OneHotEncoder(handle_unknown="ignore"), ["previous_default"]),
     ("num", "passthrough", ["land_size_acres","annual_income","credit_score"])
 ])
 
-pipe = Pipeline([
-    ("prep", prep),
+model = Pipeline([
+    ("prep", preprocess),
     ("model", RandomForestClassifier(n_estimators=150, random_state=42))
 ])
 
-pipe.fit(X, y)
-joblib.dump(pipe, MODEL_FILE)
+model.fit(X, y)
+joblib.dump(model, MODEL_FILE)
 
 # =========================================================
-# FILE UPLOAD (SAFE & ERROR-FREE)
+# FILE UPLOAD & PREDICTION
 # =========================================================
 
-st.markdown("## 📂 Loan Risk Indicator (CSV / Excel)")
+st.markdown("## 📂 Loan Risk Indicator (CSV / Excel Upload)")
 
 file = st.file_uploader("Upload CSV or Excel", ["csv","xlsx"])
 
@@ -205,14 +196,14 @@ if file:
 
     data = data[required_features]
 
-    data["Indicative_Risk_Category"] = pipe.predict(data)
-    data["Confidence_%"] = (pipe.predict_proba(data).max(axis=1)*100).round(2)
+    data["Indicative_Risk_Category"] = model.predict(data)
+    data["Confidence_%"] = (model.predict_proba(data).max(axis=1) * 100).round(2)
 
-    st.dataframe(data)
+    st.dataframe(data, use_container_width=True)
 
-    st.download_button("⬇ CSV", data.to_csv(index=False), "risk_indicator.csv")
-    st.download_button("⬇ Excel", to_excel(data), "risk_indicator.xlsx")
-    st.download_button("⬇ PDF", to_pdf(data), "risk_indicator.pdf")
+    st.download_button("⬇ Download CSV", data.to_csv(index=False), "risk_indicator.csv")
+    st.download_button("⬇ Download Excel", to_excel(data), "risk_indicator.xlsx")
+    st.download_button("⬇ Download PDF", to_pdf(data), "risk_indicator.pdf")
 
 # =========================================================
 # LEGAL DISCLAIMER
