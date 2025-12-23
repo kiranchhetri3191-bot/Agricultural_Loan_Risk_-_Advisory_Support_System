@@ -92,3 +92,9 @@ This project is an **original, self-developed work**.
 Unauthorized commercial use, redistribution, or claiming this project as one’s own is strictly prohibited without prior written permission from the author.
 
 Educational and non-commercial use is permitted **with proper credit to the author**.
+
+Disclaimer:
+This application uses publicly available open-source weather data 
+for educational and advisory purposes only. 
+Predictions are indicative and should not be treated as official or guaranteed.
+
