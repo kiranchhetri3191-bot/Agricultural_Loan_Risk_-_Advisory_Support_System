@@ -160,8 +160,18 @@ if not os.path.exists(DATA_FILE):
 
 df = pd.read_csv(DATA_FILE)
 
+# Features
 X = df.drop(columns=["risk_flag"], errors="ignore")
 
+#Target
+y = df["risk_flag"]
+
+#Train
+pipe.fit(X,y)
+
+#save model
+joblib.dump(pipe, MODEL_FILE]
+            
 required_features = X.columns.tolist()
 
 prep = ColumnTransformer([
