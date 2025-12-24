@@ -61,13 +61,21 @@ This platform is a **Decision Support System (DSS)**.
 
 st.divider()
 
-# ---------------- TITLE ----------------
-st.markdown("""
-<h1 style='text-align:center;'>logo.png Agricultural Loan Risk & Advisory Dashboard</h1>
-<p style='text-align:center; font-size:17px;'>
-CSV Upload • Visual Insights • Improvement Guidance
-</p>
-""", unsafe_allow_html=True)
+# ---------------- TITLE (LOGO FIXED – MATCHES ICON) ----------------
+col1, col2 = st.columns([1, 8])
+
+with col1:
+    st.image("logo.png", width=80)
+
+with col2:
+    st.markdown("""
+    <h1 style='margin-bottom:0;'>
+    Agricultural Loan Risk & Advisory Dashboard
+    </h1>
+    <p style='font-size:17px; margin-top:5px;'>
+    CSV Upload • Visual Insights • Improvement Guidance
+    </p>
+    """, unsafe_allow_html=True)
 
 # ---------------- DEMO DATA ----------------
 def generate_demo_data(n=7000):
@@ -197,10 +205,8 @@ if file:
 
     col1, col2 = st.columns(2)
 
-    # ---- PIE (ORDER & COLOR LOCKED) ----
     with col1:
         risk_counts = df["Risk_Category"].value_counts().reindex(risk_order, fill_value=0)
-
         fig, ax = plt.subplots(figsize=(6, 6))
         ax.pie(
             risk_counts.values,
@@ -213,7 +219,6 @@ if file:
         ax.set_title("Overall Risk Distribution", fontsize=14, fontweight="bold")
         st.pyplot(fig)
 
-    # ---- HISTOGRAM ----
     with col2:
         fig, ax = plt.subplots(figsize=(7, 5))
         ax.hist(df["credit_score"], bins=25, color="#4CAF50", edgecolor="black")
@@ -223,7 +228,6 @@ if file:
         ax.grid(axis="y", alpha=0.3)
         st.pyplot(fig)
 
-    # ---- SCATTER ----
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.scatter(
         df["annual_farm_income"],
@@ -237,9 +241,7 @@ if file:
     ax.grid(alpha=0.3)
     st.pyplot(fig)
 
-    # ---- BAR (ORDER & COLOR LOCKED) ----
     st.subheader("Risk Category Count")
-
     fig, ax = plt.subplots(figsize=(7, 4))
     ax.bar(
         risk_counts.index,
@@ -252,9 +254,7 @@ if file:
     ax.grid(axis="y", alpha=0.3)
     st.pyplot(fig)
 
-    # ---- BOXPLOT ----
     st.subheader("Income Distribution by Risk Category")
-
     fig, ax = plt.subplots(figsize=(8, 5))
     df.boxplot(column="annual_farm_income", by="Risk_Category", ax=ax, grid=True)
     ax.set_title("Annual Farm Income by Risk Level", fontsize=14, fontweight="bold")
@@ -263,18 +263,10 @@ if file:
     plt.suptitle("")
     st.pyplot(fig)
 
-    # ---- STACKED BAR: CROP ----
     st.subheader("Crop Type vs Risk Category")
-
     crop_risk = df.groupby("crop_type")["Risk_Category"].value_counts().unstack().reindex(columns=risk_order, fill_value=0)
-
     fig, ax = plt.subplots(figsize=(9, 5))
-    crop_risk.plot(
-        kind="bar",
-        stacked=True,
-        color=[risk_colors[r] for r in risk_order],
-        ax=ax
-    )
+    crop_risk.plot(kind="bar", stacked=True, color=[risk_colors[r] for r in risk_order], ax=ax)
     ax.set_title("Crop-wise Risk Distribution", fontsize=14, fontweight="bold")
     ax.set_xlabel("Crop Type")
     ax.set_ylabel("Number of Farmers")
@@ -282,18 +274,10 @@ if file:
     ax.grid(axis="y", alpha=0.3)
     st.pyplot(fig)
 
-    # ---- STACKED BAR: IRRIGATION ----
     st.subheader("Irrigation Type vs Risk Category")
-
     irrig_risk = df.groupby("irrigation_type")["Risk_Category"].value_counts().unstack().reindex(columns=risk_order, fill_value=0)
-
     fig, ax = plt.subplots(figsize=(8, 5))
-    irrig_risk.plot(
-        kind="bar",
-        stacked=True,
-        color=[risk_colors[r] for r in risk_order],
-        ax=ax
-    )
+    irrig_risk.plot(kind="bar", stacked=True, color=[risk_colors[r] for r in risk_order], ax=ax)
     ax.set_title("Irrigation Impact on Risk", fontsize=14, fontweight="bold")
     ax.set_xlabel("Irrigation Type")
     ax.set_ylabel("Number of Farmers")
