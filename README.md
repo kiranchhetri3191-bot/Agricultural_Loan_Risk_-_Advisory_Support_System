@@ -151,7 +151,14 @@ To use this application, upload a CSV file with the following **required column 
 ### 📌 Important Notes
 - All monetary values should be in **Indian Rupees (₹)**  
 - Column names must match **exactly**  
-- This system provides **risk insights only**, not loan approval decisions  
+- This system provides **risk insights only**, not loan approval decisions
+
+### Data Dictionary (Selected Fields)
+
+| Field Name | Description |
+|----------|------------|
+| crop_type | Type of crop cultivated (Rice, Wheat, Maize, Cotton, Sugarcane) |
+
 
 
 ## ⚖️ Legal & Ethical Note
