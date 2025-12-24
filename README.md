@@ -1,4 +1,4 @@
-# 🌾logo.png Agricultural Loan Risk & Advisory System  
+# 🌾 Agricultural Loan Risk & Advisory System  
 ### Decision Support System for Agricultural Finance (B.Com Project)
 
 ---
